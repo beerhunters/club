@@ -3,6 +3,7 @@ from aiogram.types import ChatMemberUpdated
 from aiogram.enums.chat_member_status import ChatMemberStatus
 
 from db.services.group_admin import save_group_admin
+from db.database import AsyncSessionLocal
 from bot.logger import setup_logger
 
 router = Router()
@@ -36,10 +37,13 @@ async def on_my_chat_member(event: ChatMemberUpdated, bot: Bot):
             logger.info(f"Бот стал админом в чате {chat_id}, добавил {admin_id}")
             # Создаем сессию и передаем в сервис
             async with AsyncSessionLocal() as session:
-                await save_group_admin(
-                    chat_id=chat_id, user_id=admin_id, session=session
-                )
-
+                try:
+                    await save_group_admin(
+                        session=session, chat_id=chat_id, user_id=admin_id
+                    )
+                    logger.info(f"Saved admin {admin_id} for chat {chat_id}")
+                except Exception as e:
+                    logger.error(f"Error saving group admin: {e}")
         else:
             logger.info(
                 f"Изменение прав бота не подходит под нужный критерий. "
