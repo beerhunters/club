@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Админка</title>
+</head>
+<body>
+<h1>Добро пожаловать, {{ user }}!</h1>
+<a href="{{ url_for('auth.logout') }}">Выйти</a>
+</body>
+</html>

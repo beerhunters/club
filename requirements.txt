@@ -1,0 +1,9 @@
+aiogram==3.*
+Flask==2.*
+flask-session
+python-dotenv
+SQLAlchemy[asyncio]==2.*
+asyncpg
+celery==5.*
+redis
+gunicorn

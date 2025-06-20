@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+RUN adduser --disabled-password --gecos '' botuser
+
+WORKDIR /app
+
+COPY . /app
+
+RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONPATH=/app
+
+USER botuser
+
+CMD ["python", "-m","bot.main"]
