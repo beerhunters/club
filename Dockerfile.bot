@@ -1,14 +1,24 @@
 FROM python:3.11-slim
 
+# 1. Создаем системного пользователя
 RUN adduser --disabled-password --gecos '' botuser
 
+# 2. Устанавливаем рабочую директорию
 WORKDIR /app
 
+# 3. Копируем проект
 COPY . /app
 
-RUN pip install --no-cache-dir -r requirements.txt
-ENV PYTHONPATH=/app
+# 4. Создаем папки и даем права
+RUN mkdir -p /app/logs && chown -R botuser:botuser /app/logs
 
+# 5. Устанавливаем зависимости
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 6. Переключаемся на пользователя
 USER botuser
 
-CMD ["python", "-m","bot.main"]
+# 7. Устанавливаем PYTHONPATH и запускаем модуль
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "bot.main"]

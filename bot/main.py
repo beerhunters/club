@@ -5,8 +5,10 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from shared.config import settings
 from bot.handlers.start import register_start
-from bot.logger import logger
 from bot.error_handler import setup_error_handler
+from bot.logger import setup_logger
+
+logger = setup_logger("bot")
 
 
 async def main():
@@ -19,7 +21,7 @@ async def main():
     register_start(dp)
     setup_error_handler(dp, bot)
 
-    logger.info("Bot started")
+    logger.info("Запуск бота...")
     await dp.start_polling(bot)
 
 

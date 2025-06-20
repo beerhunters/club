@@ -7,3 +7,5 @@ asyncpg
 celery==5.*
 redis
 gunicorn
+requests
+pendulum
