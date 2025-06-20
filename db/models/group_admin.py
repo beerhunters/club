@@ -1,9 +1,8 @@
 # db/models/group_admin.py
 from sqlalchemy import Column, BigInteger, DateTime
-from sqlalchemy.orm import declarative_base
-import pendulum
+from sqlalchemy.sql import func
 
-Base = declarative_base()
+from db.database import Base
 
 
 class GroupAdmin(Base):
@@ -11,4 +10,4 @@ class GroupAdmin(Base):
 
     chat_id = Column(BigInteger, primary_key=True)
     user_id = Column(BigInteger, nullable=False)
-    added_at = Column(DateTime, default=pendulum.now)
+    added_at = Column(DateTime(timezone=True), default=func.now())

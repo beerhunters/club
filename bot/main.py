@@ -5,6 +5,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot.handlers import join
+from db.database import init_db
 from shared.config import settings
 from bot.handlers.start import register_start
 from bot.error_handler import setup_error_handler
@@ -14,6 +15,12 @@ logger = setup_logger("bot")
 
 
 async def main():
+    logger.info("Запуск бота...")
+
+    # Initialize database tables
+    await init_db()
+    logger.info("Database tables created")
+
     bot = Bot(
         token=settings.BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -24,7 +31,6 @@ async def main():
     setup_error_handler(dp, bot)
     dp.include_router(join.router)
 
-    logger.info("Запуск бота...")
     # Пример запуска polling с фильтром обновлений
     allowed_updates = ["message", "callback_query", "my_chat_member", "chat_member"]
 
