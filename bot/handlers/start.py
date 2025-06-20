@@ -9,7 +9,6 @@ router = Router()
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     await message.answer(START_TEXT)
-    1 / 0
 
 
 def register_start(dp):
