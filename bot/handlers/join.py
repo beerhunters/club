@@ -2,9 +2,8 @@ from aiogram import Router, Bot
 from aiogram.types import ChatMemberUpdated
 from aiogram.enums.chat_member_status import ChatMemberStatus
 
-from db.services.group_admin import save_group_admin
+from db.services import save_group_admin
 
-# from db.database import AsyncSessionLocal
 from db.database import async_session_maker
 from bot.logger import setup_logger
 

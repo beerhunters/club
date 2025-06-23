@@ -4,7 +4,7 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.services.user import get_user_by_id
+from db.services import get_user_by_id
 from bot.texts import START_TEXT, START_ALREADY_REGISTERED, START_REGISTER_BUTTON
 from bot.fsm.registration import Registration
 from bot.logger import setup_logger
@@ -64,7 +64,3 @@ async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
 
     # Просто /start в личке без аргументов
     await message.answer(START_TEXT)
-
-
-def register_start(dp):
-    dp.include_router(router)

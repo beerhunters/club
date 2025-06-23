@@ -3,8 +3,8 @@ from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from bot.fsm.registration import Registration
-from db.models.user import User
-from db.services.user import save_user
+from db.models import User
+from db.services import create_user
 from bot.logger import setup_logger
 from datetime import datetime
 
@@ -54,7 +54,7 @@ async def get_birth_date(message: Message, state: FSMContext, session: AsyncSess
         birth_date=birth_date,
         registered_from_group_id=data["group_id"],
     )
-    await save_user(session, user)
+    await create_user(session, user)
     await message.answer("Спасибо! Ты зарегистрирован ✅")
     await state.clear()
     logger.info(f"Registered user {user_id}: {user}")
