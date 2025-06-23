@@ -46,6 +46,8 @@ from db.database import async_session_maker
 from db.services import get_group_admin_by_user_id, create_event, get_users_by_group_id
 from db.schemas import EventCreate
 from bot.logger import setup_logger
+
+# from celery_app.tasks import send_notification
 from celery_app.tasks import send_notification
 from datetime import datetime
 import pendulum
@@ -381,206 +383,98 @@ async def process_notification_time(message: Message, state: FSMContext, bot: Bo
         )
 
 
-# async def finalize_event_creation(message: Message, bot: Bot, state: FSMContext):
-#     try:
-#         data = await state.get_data()
-#         has_beer_choice = data.get("has_beer_choice", False)
-#         beer_option_1 = data.get("beer_option_1")
-#         beer_option_2 = data.get("beer_option_2")
-#         if has_beer_choice and (not beer_option_1 or not beer_option_2):
-#             await message.answer(EVENT_BEER_INVALID, reply_markup=get_cancel_keyboard())
-#             return
-#         event_date = pendulum.from_format(
-#             data["event_date"], "DD.MM.YYYY", tz="Europe/Moscow"
-#         ).date()
-#         event_time = datetime.strptime(data["event_time"], "%H:%M").time()
-#         event_data = EventCreate(
-#             name=data["name"],
-#             event_date=event_date,
-#             event_time=event_time,
-#             latitude=data.get("latitude"),
-#             longitude=data.get("longitude"),
-#             location_name=data.get("location_name"),
-#             description=data.get("description"),
-#             image_file_id=data.get("image_file_id"),
-#             has_beer_choice=has_beer_choice,
-#             beer_option_1=beer_option_1,
-#             beer_option_2=beer_option_2,
-#             created_by=message.from_user.id,
-#             chat_id=data["chat_id"],
-#         )
-#         async with async_session_maker() as session:
-#             event = await create_event(session, event_data)
-#             event_start = pendulum.datetime(
-#                 year=event.event_date.year,
-#                 month=event.event_date.month,
-#                 day=event.event_date.day,
-#                 hour=event.event_time.hour,
-#                 minute=event.event_time.minute,
-#                 tz="Europe/Moscow",
-#             )
-#             notification_text = EVENT_NOTIFICATION_TEXT.format(
-#                 name=event.name,
-#                 date=event.event_date.strftime("%d.%m.%Y"),
-#                 time=event.event_time.strftime("%H:%M"),
-#                 location=event.location_name or "Не указано",
-#                 description=event.description or "Не указано",
-#                 beer_options=(
-#                     f"{event.beer_option_1}, {event.beer_option_2}"
-#                     if event.has_beer_choice
-#                     else "Лагер"
-#                 ),
-#             )
-#             notification_choice = data.get("notification_choice", "notify_immediate")
-#             if notification_choice == "notify_immediate":
-#                 await send_event_notifications(bot, event, session, notification_text)
-#             else:
-#                 notification_time = data["notification_time"]
-#                 hour, minute = map(int, notification_time.split(":"))
-#                 eta = datetime(
-#                     year=event_date.year,
-#                     month=event_date.month,
-#                     day=event_date.day,
-#                     hour=hour,
-#                     minute=minute,
-#                     tzinfo=pendulum.timezone("Europe/Moscow"),
-#                 )
-#                 try:
-#                     task = send_notification.apply_async(
-#                         args=[event.id, notification_text],
-#                         eta=eta,
-#                     )
-#                     logger.info(
-#                         f"Scheduled notification task {task.id} for event {event.id} at {eta}"
-#                     )
-#                 except Exception as e:
-#                     logger.error(
-#                         f"Failed to schedule notification task for event {event.id}: {e}",
-#                         exc_info=True,
-#                     )
-#                     await message.answer(
-#                         "⚠️ Событие создано, но уведомление не запланировано. Свяжитесь с администратором.",
-#                         reply_markup=get_cancel_keyboard(),
-#                     )
-#                     await state.clear()
-#                     return
-#             # Schedule bartender notification at event start time
-#             try:
-#                 eta = datetime(
-#                     year=event_start.year,
-#                     month=event_start.month,
-#                     day=event_start.day,
-#                     hour=event_start.hour,
-#                     minute=event_start.minute,
-#                     tzinfo=event_start.tzinfo,
-#                 )
-#                 task = send_notification.apply_async(
-#                     args=[event.id, notification_text],
-#                     eta=eta,
-#                 )
-#                 logger.info(
-#                     f"Scheduled bartender notification task {task.id} for event {event.id} at {eta}"
-#                 )
-#             except Exception as e:
-#                 logger.error(
-#                     f"Failed to schedule bartender notification task for event {event.id}: {e}",
-#                     exc_info=True,
-#                 )
-#                 await message.answer(
-#                     "⚠️ Событие создано, но уведомление бармену не запланировано. Свяжитесь с администратором.",
-#                     reply_markup=get_cancel_keyboard(),
-#                 )
-#                 await state.clear()
-#                 return
-#             summary = EVENT_NOTIFICATION_SUMMARY.format(
-#                 name=event.name,
-#                 date=event.event_date.strftime("%d.%m.%Y"),
-#                 time=event.event_time.strftime("%H:%M"),
-#                 location=event.location_name or "Не указано",
-#                 description=event.description or "Не указано",
-#                 image="Есть" if event.image_file_id else "Нет",
-#                 beer_choice="Да" if event.has_beer_choice else "Нет",
-#                 beer_options=(
-#                     f"{event.beer_option_1}, {event.beer_option_2}"
-#                     if event.has_beer_choice
-#                     else "Лагер"
-#                 ),
-#             )
-#             await message.answer(summary)
-#             await message.answer(EVENT_CREATED)
-#             logger.info(f"Event created: {event.id} by {message.from_user.id}")
-#         await state.clear()
-#     except Exception as e:
-#         logger.error(f"Error finalizing event creation: {e}", exc_info=True)
-#         await message.answer(EVENT_ERROR, reply_markup=get_cancel_keyboard())
-#         await state.clear()
 async def finalize_event_creation(message: Message, bot: Bot, state: FSMContext):
-    async with async_session_maker() as session:
+    """Финализация создания события"""
+    try:
+        session = message.session  # Получаем сессию из middleware
         data = await state.get_data()
-        try:
-            event_time = datetime.strptime(data["event_time"], "%H:%M").time()
-            event_date = pendulum.parse(data["event_date"]).date()
-            event_data = EventCreate(
-                name=data["event_name"],
-                event_date=event_date,
-                event_time=event_time,
-                latitude=data.get("latitude"),
-                longitude=data.get("longitude"),
-                location_name=data.get("location_name"),
-                description=data.get("description"),
-                image_file_id=data.get("image_file_id"),
-                has_beer_choice=data.get("has_beer_choice", False),
-                beer_option_1=data.get("beer_option_1"),
-                beer_option_2=data.get("beer_option_2"),
-                created_by=message.from_user.id,
-                chat_id=message.chat.id,
+
+        # Подготовка данных события
+        event_time = datetime.strptime(data["event_time"], "%H:%M").time()
+        event_date = pendulum.parse(data["event_date"]).date()
+
+        event_data = EventCreate(
+            name=data["name"],
+            event_date=event_date,
+            event_time=event_time,
+            latitude=data.get("latitude"),
+            longitude=data.get("longitude"),
+            location_name=data.get("location_name"),
+            description=data.get("description"),
+            image_file_id=data.get("image_file_id"),
+            has_beer_choice=data.get("has_beer_choice", False),
+            beer_option_1=data.get("beer_option_1"),
+            beer_option_2=data.get("beer_option_2"),
+            created_by=message.from_user.id,
+            chat_id=data["chat_id"],
+        )
+
+        # Создание события в базе данных
+        event = await create_event(session, event_data)
+
+        # Подготовка текста уведомления
+        beer_options = "Лагер"
+        if (
+            data.get("has_beer_choice")
+            and data.get("beer_option_1")
+            and data.get("beer_option_2")
+        ):
+            beer_options = f"{data['beer_option_1']}, {data['beer_option_2']}"
+
+        notification_text = EVENT_NOTIFICATION_TEXT.format(
+            name=data["name"],
+            date=data["event_date"],
+            time=data["event_time"],
+            location=data.get("location_name", "Не указано"),
+            description=data.get("description", "Не указано"),
+            beer_options=beer_options,
+        )
+
+        # Отправка уведомления через Celery
+        notification_choice = data.get("notification_choice", "notify_immediate")
+
+        if notification_choice == "notify_immediate":
+            # Немедленная отправка
+            task = send_notification.delay(event.chat_id, notification_text)
+            logger.info(f"Задача уведомления создана: {task.id}")
+        elif notification_choice == "notify_scheduled":
+            # Запланированная отправка
+            notification_time = pendulum.parse(
+                data["notification_time"], tz="Europe/Moscow"
             )
-            event = await create_event(session, event_data)
-            notification_text = EVENT_NOTIFICATION_TEXT.format(
-                name=event.name,
-                date=event.event_date.strftime("%d.%m.%Y"),
-                time=event.event_time.strftime("%H:%M"),
-                location=event.location_name or "Не указано",
-                description=event.description or "Без описания",
-                beer_options=", ".join(
-                    [opt for opt in [event.beer_option_1, event.beer_option_2] if opt]
-                )
-                or "Лагер",
+
+            # Отправляем задачу с задержкой
+            eta = notification_time.to_datetime_string()
+            task = send_notification.apply_async(
+                args=[event.chat_id, notification_text],
+                eta=notification_time.in_timezone("UTC").to_datetime_string(),
             )
-            notification_choice = data.get("notification_choice", "notify_immediate")
-            if notification_choice == "notify_scheduled":
-                notification_time = pendulum.parse(
-                    data["notification_time"], tz="Europe/Moscow"
-                )
-                eta = notification_time.to_datetime_string()
-                send_notification.apply_async(
-                    args=[event.chat_id, notification_text],
-                    eta=notification_time,
-                )
-                logger.info(f"Scheduled notification for event {event.id} at {eta}")
-            else:
-                task = await send_notification(event.chat_id, notification_text)
-                logger.info(f"Immediate notification sent for event {event.id}: {task}")
-            summary = EVENT_NOTIFICATION_SUMMARY.format(
-                name=event.name,
-                date=event.event_date.strftime("%d.%m.%Y"),
-                time=event.event_time.strftime("%H:%M"),
-                location=event.location_name or "Не указано",
-                description=event.description or "Без описания",
-                image="Есть" if event.image_file_id else "Нет",
-                beer_choice="Да" if event.has_beer_choice else "Нет",
-                beer_options=", ".join(
-                    [opt for opt in [event.beer_option_1, event.beer_option_2] if opt]
-                )
-                or "Лагер",
+            logger.info(
+                f"Запланированная задача уведомления создана: {task.id} на {eta}"
             )
-            await message.answer(summary)
-            await message.answer(EVENT_CREATED)
-            await state.clear()
-        except Exception as e:
-            logger.error(f"Error creating event: {e}")
-            await message.answer("❌ Произошла ошибка при создании события.")
-            await state.clear()
+
+        # Отправка подтверждения создателю
+        summary = EVENT_NOTIFICATION_SUMMARY.format(
+            name=data["name"],
+            date=data["event_date"],
+            time=data["event_time"],
+            location=data.get("location_name", "Не указано"),
+            description=data.get("description", "Не указано"),
+            image="Есть" if data.get("image_file_id") else "Нет",
+            beer_choice="Да" if data.get("has_beer_choice") else "Нет",
+            beer_options=beer_options,
+        )
+
+        await message.answer(summary)
+        await message.answer(EVENT_CREATED)
+
+        # Очистка состояния
+        await state.clear()
+
+    except Exception as e:
+        logger.error(f"Ошибка при финализации создания события: {e}")
+        await message.answer(EVENT_ERROR)
+        await state.clear()
 
 
 async def send_event_notifications(
