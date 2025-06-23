@@ -5,7 +5,15 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.services import get_user_by_id
-from bot.texts import START_TEXT, START_ALREADY_REGISTERED, START_REGISTER_BUTTON
+from bot.texts import (
+    START_SIMPLE_TEXT,
+    START_ALREADY_REGISTERED,
+    START_REGISTER_BUTTON,
+    INVALID_LINK_FORMAT,
+    GREET_NAME,
+    ALREADY_REGISTERED_IN_GROUP,
+    REGISTER_IN_PRIVATE,
+)
 from bot.fsm.registration import Registration
 from bot.logger import setup_logger
 
@@ -28,8 +36,8 @@ async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
         try:
             group_id = int(text_parts[1].split("_")[1])
         except (IndexError, ValueError):
-            logger.warning("Invalid registration link format.")
-            await message.answer("Неверный формат ссылки регистрации.")
+            logger.warning("Invalid registration link format")
+            await message.answer(INVALID_LINK_FORMAT)
             return
 
         user = await get_user_by_id(session, user_id)
@@ -39,14 +47,14 @@ async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
             await state.set_state(Registration.name)
             await state.update_data(group_id=group_id)
             logger.info(f"User {user_id} starts registration from group {group_id}")
-            await message.answer("Привет! Как тебя зовут?")
+            await message.answer(GREET_NAME)
         return
 
     # Команда /start в группе
     if message.chat.type in ("group", "supergroup"):
         user = await get_user_by_id(session, user_id)
         if user:
-            await message.reply("Вы уже зарегистрированы.")
+            await message.reply(ALREADY_REGISTERED_IN_GROUP)
         else:
             group_id = message.chat.id
             bot_user = await message.bot.get_me()
@@ -57,10 +65,10 @@ async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
                 ]
             )
             await message.reply(
-                "Пройдите регистрацию в личных сообщениях с ботом:",
+                REGISTER_IN_PRIVATE,
                 reply_markup=keyboard,
             )
         return
 
     # Просто /start в личке без аргументов
-    await message.answer(START_TEXT)
+    await message.answer(START_SIMPLE_TEXT)

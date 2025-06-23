@@ -4,7 +4,14 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from bot.fsm.registration import Registration
 from db.models import User
+from db.schemas import UserCreate
 from db.services import create_user
+from bot.texts import (
+    NAME_TOO_SHORT,
+    ASK_BIRTH_DATE,
+    INVALID_DATE_FORMAT,
+    REGISTRATION_SUCCESS,
+)
 from bot.logger import setup_logger
 from datetime import datetime
 
@@ -16,13 +23,11 @@ logger = setup_logger("registration")
 async def get_name(message: Message, state: FSMContext):
     name = message.text.strip()
     if len(name) < 2:
-        await message.answer("Имя слишком короткое. Попробуй ещё раз.")
+        await message.answer(NAME_TOO_SHORT)
         return
     await state.update_data(name=name)
     await state.set_state(Registration.birth_date)
-    await message.answer(
-        "Когда у тебя день рождения? (ДД.ММ.ГГГГ, ДД.ММ или можно пропустить)"
-    )
+    await message.answer(ASK_BIRTH_DATE)
 
 
 @router.message(Registration.birth_date)
@@ -42,12 +47,10 @@ async def get_birth_date(message: Message, state: FSMContext, session: AsyncSess
             else:
                 raise ValueError
         except ValueError:
-            await message.answer(
-                "Формат неверный. Введи дату в формате ДД.ММ.ГГГГ или ДД.ММ, или напиши «пропустить»."
-            )
+            await message.answer(INVALID_DATE_FORMAT)
             return
 
-    user = User(
+    user = UserCreate(
         telegram_id=user_id,
         username=username,
         name=data["name"],
@@ -55,6 +58,6 @@ async def get_birth_date(message: Message, state: FSMContext, session: AsyncSess
         registered_from_group_id=data["group_id"],
     )
     await create_user(session, user)
-    await message.answer("Спасибо! Ты зарегистрирован ✅")
+    await message.answer(REGISTRATION_SUCCESS)
     await state.clear()
     logger.info(f"Registered user {user_id}: {user}")

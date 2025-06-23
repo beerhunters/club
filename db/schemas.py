@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import date
+from datetime import date, datetime
 
 
 class GroupAdminCreate(BaseModel):
@@ -21,3 +21,4 @@ class UserResponse(BaseModel):
     name: str
     birth_date: date | None
     registered_from_group_id: int
+    registered_at: datetime
