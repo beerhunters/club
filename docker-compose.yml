@@ -1,62 +1,181 @@
 services:
-  db:
-    image: postgres:15
-    restart: always
+  postgres:
+    image: postgres:15-alpine
+    container_name: beer_bot_postgres
     environment:
       POSTGRES_DB: myapp
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
       TZ: Europe/Moscow
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 3s
+      test: ["CMD-SHELL", "pg_isready -U bot_user -d beer_bot"]
+      interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - bot_network
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    restart: always
+    container_name: beer_bot_redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bot_network
+    restart: unless-stopped
 
   bot:
     build:
       context: .
       dockerfile: Dockerfile.bot
-    depends_on:
-      db:
-        condition: service_healthy
+    container_name: beer_bot
+    user: botuser
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
       ERROR_CHAT_ID: ${ERROR_CHAT_ID}
-      LOG_LEVEL: ${LOG_LEVEL}
-    restart: on-failure
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FILE: ${LOG_FILE:-bot.log}
+      TZ: Europe/Moscow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - bot_network
+    restart: unless-stopped
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot  # Reuses Dockerfile.bot for consistency
+    container_name: beer_bot_celery_worker
+    user: botuser
+    command: celery -A celery_app.celery worker --loglevel=${LOG_LEVEL:-INFO} --pool=solo
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DATABASE_URL: postgresql+asyncpg://bot_user:bot_password@postgres:5432/beer_bot
+      REDIS_URL: redis://redis:6379/0
+      ERROR_CHAT_ID: ${ERROR_CHAT_ID}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FILE: ${LOG_FILE:-celery_worker.log}
+      TZ: Europe/Moscow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A celery_app.celery status | grep -q 'OK'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - bot_network
+    restart: unless-stopped
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: beer_bot_celery_beat
+    user: botuser
+    command: celery -A celery_app.celery beat --loglevel=${LOG_LEVEL:-INFO}
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      ERROR_CHAT_ID: ${ERROR_CHAT_ID}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FILE: ${LOG_FILE:-celery_beat.log}
+      TZ: Europe/Moscow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - bot_network
+    restart: unless-stopped
+
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: beer_bot_flower
+    user: botuser
+    command: celery -A celery_app.celery flower --port=5555
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FILE: ${LOG_FILE:-flower.log}
+      TZ: Europe/Moscow
+    depends_on:
+      redis:
+        condition: service_healthy
+      celery_worker:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5555:5555"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - bot_network
+    restart: unless-stopped
+
   web:
     build:
       context: .
       dockerfile: Dockerfile.web
+    container_name: beer_bot_web
     ports:
-      - "5050:5050"
+      - "127.0.0.1:5050:5050"
     environment:
-      FLASK_SECRET: ${FLASK_SECRET}
-      ADMIN_USERNAME: ${ADMIN_USERNAME}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      REDIS_URL: ${REDIS_URL}
-
-  celery:
-    build:
-      context: .
-      dockerfile: Dockerfile.celery
+      FLASK_SECRET: ${FLASK_SECRET:-dev}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FILE: ${LOG_FILE:-web.log}
+      TZ: Europe/Moscow
     depends_on:
-      - db
-      - redis
-    environment:
-      REDIS_URL: ${REDIS_URL}
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - ./flask_session:/app/flask_session
+    networks:
+      - bot_network
+    restart: unless-stopped
 
 volumes:
-  pgdata:
+  postgres_data:
+  redis_data:
+  flask_session:
+
+networks:
+  bot_network:
+    driver: bridge

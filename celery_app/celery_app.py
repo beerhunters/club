@@ -1,22 +1,19 @@
-from celery import Celery
-from celery.schedules import crontab
+from celery_app import Celery
+from celery_app.schedules import crontab
 import os
 from dotenv import load_dotenv
-from bot.utils.logger import setup_logger
+from bot.logger import setup_logger
 import pendulum
 
 load_dotenv()
 
 logger = setup_logger(__name__)
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-
-# Время запуска задач в формате HH:MM
 HERO_SELECTION_TIME = os.getenv("HERO_SELECTION_TIME", "09:01")
 BIRTHDAY_CHECK_TIME = os.getenv("BIRTHDAY_CHECK_TIME", "00:01")
 
 
 def parse_time(time_str: str) -> dict:
-    """Парсит время в формате HH:MM и возвращает словарь для crontab."""
     try:
         parsed_time = pendulum.parse(time_str, strict=False)
         hour = parsed_time.hour
@@ -29,7 +26,6 @@ def parse_time(time_str: str) -> dict:
         raise ValueError(f"Invalid time format: {time_str}. Use HH:MM (e.g., 15:15).")
 
 
-# Парсим времена при загрузке модуля
 HERO_SELECTION_CRONTAB = parse_time(HERO_SELECTION_TIME)
 BIRTHDAY_CHECK_CRONTAB = parse_time(BIRTHDAY_CHECK_TIME)
 
@@ -38,10 +34,10 @@ app = Celery(
     broker=REDIS_URL,
     backend=REDIS_URL,
     include=[
-        "bot.tasks.bartender_notification",
+        "celery_app.bartender_notification",
+        "celery_app.tasks",
         "bot.tasks.hero_notification",
         "bot.tasks.birthday_notification",
-        "celery_app.tasks",  # Include new tasks module
     ],
 )
 
