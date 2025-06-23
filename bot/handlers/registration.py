@@ -1,33 +1,27 @@
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.types import Message
-from aiogram.filters import CommandObject
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
+from bot.fsm.registration import Registration
+from db.models.user import User
+from db.services.user import save_user
+from bot.logger import setup_logger
 from datetime import datetime
 
-from bot.fsm.registration import Registration
-from db.services.user import save_user
-
-
 router = Router()
-
-
-@router.message(F.text.startswith("/registration registration_"))
-async def registration_entry(
-    message: Message, state: FSMContext, command: CommandObject
-):
-    group_id = int(command.args.split("_")[1])
-    await state.update_data(group_id=group_id)
-    await state.set_state(Registration.name)
-    await message.answer("Введите ваше имя:")
+logger = setup_logger("registration")
 
 
 @router.message(Registration.name)
 async def get_name(message: Message, state: FSMContext):
-    await state.update_data(name=message.text.strip())
+    name = message.text.strip()
+    if len(name) < 2:
+        await message.answer("Имя слишком короткое. Попробуй ещё раз.")
+        return
+    await state.update_data(name=name)
     await state.set_state(Registration.birth_date)
     await message.answer(
-        "Введите дату рождения (ДД.ММ.ГГГГ или ДД.ММ) или отправьте '-' для пропуска:"
+        "Когда у тебя день рождения? (ДД.ММ.ГГГГ, ДД.ММ или можно пропустить)"
     )
 
 
@@ -35,27 +29,32 @@ async def get_name(message: Message, state: FSMContext):
 async def get_birth_date(message: Message, state: FSMContext, session: AsyncSession):
     raw = message.text.strip()
     data = await state.get_data()
+    user_id = message.from_user.id
+    username = message.from_user.username
     birth_date = None
 
-    if raw != "-":
+    if raw.lower() not in ["-", "нет", "пропустить"]:
         try:
-            if len(raw.split(".")) == 2:
-                birth_date = datetime.strptime(raw, "%d.%m").replace(
-                    year=1900
-                )  # условный год
-            elif len(raw.split(".")) == 3:
-                birth_date = datetime.strptime(raw, "%d.%m.%Y")
+            if raw.count(".") == 1:
+                birth_date = datetime.strptime(raw, "%d.%m").replace(year=1900).date()
+            elif raw.count(".") == 2:
+                birth_date = datetime.strptime(raw, "%d.%m.%Y").date()
+            else:
+                raise ValueError
         except ValueError:
-            await message.answer("Неверный формат. Повторите ввод:")
+            await message.answer(
+                "Формат неверный. Введи дату в формате ДД.ММ.ГГГГ или ДД.ММ, или напиши «пропустить»."
+            )
             return
 
-    await save_user(
-        session=session,
-        telegram_id=message.from_user.id,
-        username=message.from_user.username,
+    user = User(
+        telegram_id=user_id,
+        username=username,
         name=data["name"],
         birth_date=birth_date,
-        group_id=data["group_id"],
+        registered_from_group_id=data["group_id"],
     )
-    await message.answer("Регистрация завершена ✅")
+    await save_user(session, user)
+    await message.answer("Спасибо! Ты зарегистрирован ✅")
     await state.clear()
+    logger.info(f"Registered user {user_id}: {user}")
