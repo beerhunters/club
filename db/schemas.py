@@ -10,9 +10,9 @@ class GroupAdminCreate(BaseModel):
 
 class UserCreate(BaseModel):
     telegram_id: int
-    username: str | None
+    username: Optional[str]
     name: str
-    birth_date: date | None
+    birth_date: Optional[date]
     registered_from_group_id: int
 
 

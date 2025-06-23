@@ -3,8 +3,7 @@ from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from db.services import get_user_by_id
+from bot.core.repositories.user_repository import UserRepository
 from bot.texts import (
     START_SIMPLE_TEXT,
     START_ALREADY_REGISTERED,
@@ -25,9 +24,9 @@ logger = setup_logger("start")
 async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
     user_id = message.from_user.id
     text_parts = message.text.split(maxsplit=1)
-    logger.info(f"/start from {user_id}, text: {message.text}")
+    logger.info(f"/start от {user_id}, текст: {message.text}")
 
-    # Пользователь пришёл по диплинку в ЛС
+    # Пользователь пришел по диплинку в ЛС
     if (
         message.chat.type == "private"
         and len(text_parts) == 2
@@ -36,23 +35,25 @@ async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
         try:
             group_id = int(text_parts[1].split("_")[1])
         except (IndexError, ValueError):
-            logger.warning("Invalid registration link format")
+            logger.warning("Неверный формат ссылки регистрации")
             await message.answer(INVALID_LINK_FORMAT)
             return
 
-        user = await get_user_by_id(session, user_id)
+        user = await UserRepository.get_user_by_id(session, user_id)
         if user:
             await message.answer(START_ALREADY_REGISTERED)
         else:
             await state.set_state(Registration.name)
             await state.update_data(group_id=group_id)
-            logger.info(f"User {user_id} starts registration from group {group_id}")
+            logger.info(
+                f"Пользователь {user_id} начал регистрацию из группы {group_id}"
+            )
             await message.answer(GREET_NAME)
         return
 
     # Команда /start в группе
     if message.chat.type in ("group", "supergroup"):
-        user = await get_user_by_id(session, user_id)
+        user = await UserRepository.get_user_by_id(session, user_id)
         if user:
             await message.reply(ALREADY_REGISTERED_IN_GROUP)
         else:
