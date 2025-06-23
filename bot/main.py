@@ -7,7 +7,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from aiogram.types.bot_command import BotCommand
 from redis.asyncio import Redis
 
-from bot.handlers import start, join, registration
+from bot.handlers import start, join, registration, event
 from bot.middlewares.db import DBSessionMiddleware
 from db.database import init_db
 from shared.config import settings
@@ -35,7 +35,7 @@ async def main():
     dp = Dispatcher(storage=storage)
 
     setup_error_handler(dp, bot)
-    dp.include_routers(start.router, join.router, registration.router)
+    dp.include_routers(start.router, join.router, registration.router, event.router)
     dp.message.middleware(DBSessionMiddleware())
     dp.callback_query.middleware(DBSessionMiddleware())
 
