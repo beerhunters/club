@@ -3,7 +3,9 @@ from aiogram.types import ChatMemberUpdated
 from aiogram.enums.chat_member_status import ChatMemberStatus
 
 from db.services.group_admin import save_group_admin
-from db.database import AsyncSessionLocal
+
+# from db.database import AsyncSessionLocal
+from db.database import async_session_maker
 from bot.logger import setup_logger
 
 router = Router()
@@ -36,7 +38,7 @@ async def on_my_chat_member(event: ChatMemberUpdated, bot: Bot):
 
             logger.info(f"Бот стал админом в чате {chat_id}, добавил {admin_id}")
             # Создаем сессию и передаем в сервис
-            async with AsyncSessionLocal() as session:
+            async with async_session_maker() as session:
                 try:
                     await save_group_admin(
                         session=session, chat_id=chat_id, user_id=admin_id
