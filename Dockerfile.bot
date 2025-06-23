@@ -1,24 +1,30 @@
 FROM python:3.11-slim
 
-# 1. Создаем системного пользователя
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create system user
 RUN adduser --disabled-password --gecos '' botuser
 
-# 2. Устанавливаем рабочую директорию
+# Set working directory
 WORKDIR /app
 
-# 3. Копируем проект
+# Copy project
 COPY . /app
 
-# 4. Создаем папки и даем права
+# Create logs directory and set permissions
 RUN mkdir -p /app/logs && chown -R botuser:botuser /app/logs
 
-# 5. Устанавливаем зависимости
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 6. Переключаемся на пользователя
+# Switch to non-root user
 USER botuser
 
-# 7. Устанавливаем PYTHONPATH и запускаем модуль
+# Set PYTHONPATH and run the application
 ENV PYTHONPATH=/app
-
 CMD ["python", "-m", "bot.main"]
