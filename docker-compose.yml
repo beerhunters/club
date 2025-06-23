@@ -83,12 +83,10 @@ services:
       - bot_network
     restart: unless-stopped
   celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.bot
+    build: .
     container_name: beer_bot_celery_worker
     user: botuser
-    command: celery -A tasks.celery_app worker --loglevel=${LOG_LEVEL:-INFO} --pool=solo
+    command: celery -A bot.tasks.celery_app worker --loglevel=${LOG_LEVEL:-INFO} --pool=solo
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-myapp}}
@@ -113,12 +111,10 @@ services:
       - bot_network
     restart: unless-stopped
   celery_beat:
-    build:
-      context: .
-      dockerfile: Dockerfile.bot
+    build: .
     container_name: beer_bot_celery_beat
     user: botuser
-    command: celery -A tasks.celery_app beat --loglevel=${LOG_LEVEL:-INFO}
+    command: celery -A bot.tasks.celery_app beat --loglevel=${LOG_LEVEL:-INFO}
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-myapp}}
@@ -137,12 +133,10 @@ services:
       - bot_network
     restart: unless-stopped
   flower:
-    build:
-      context: .
-      dockerfile: Dockerfile.bot
+    build: .
     container_name: beer_bot_flower
     user: botuser
-    command: celery -A tasks.celery_app flower --port=5555
+    command: celery -A bot.tasks.celery_app flower --port=5555
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-myapp}}

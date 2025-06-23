@@ -32,8 +32,6 @@ def parse_time(time_str: str) -> dict:
 # Парсим времена при загрузке модуля
 HERO_SELECTION_CRONTAB = parse_time(HERO_SELECTION_TIME)
 BIRTHDAY_CHECK_CRONTAB = parse_time(BIRTHDAY_CHECK_TIME)
-# logger.info(f"Hero selection scheduled at {HERO_SELECTION_TIME}")
-# logger.info(f"Birthday check scheduled at {BIRTHDAY_CHECK_TIME}")
 
 app = Celery(
     "bot",
