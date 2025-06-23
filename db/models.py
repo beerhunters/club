@@ -36,4 +36,7 @@ class User(Base):
         index=True,
     )
     registered_at = Column(DateTime(timezone=True), default=func.now(), index=True)
-    __table_args__ = ({"schema": "public"},)
+    __table_args__ = (
+        Index("idx_user_group_registered", "registered_from_group_id", "registered_at"),
+        {"schema": "public"},
+    )
