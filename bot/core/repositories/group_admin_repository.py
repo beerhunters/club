@@ -14,7 +14,7 @@ class GroupAdminRepository:
     async def create_group_admin(
         session: AsyncSession, group_admin_data: GroupAdminCreate
     ) -> GroupAdmin:
-        """Creates a new group admin record in the database."""
+        """Создает новую запись администратора группы в базе данных."""
         try:
             stmt = (
                 insert(GroupAdmin)
@@ -24,13 +24,21 @@ class GroupAdminRepository:
             result = await session.execute(stmt)
             group_admin = result.scalar_one()
             await session.commit()
+            logger.info(
+                f"Создан администратор группы: chat_id={group_admin.chat_id}, user_id={group_admin.user_id}"
+            )
             return group_admin
         except IntegrityError as e:
-            logger.error(f"Integrity error creating group admin: {e}")
+            logger.error(
+                f"Ошибка целостности при создании администратора группы: {e}",
+                exc_info=True,
+            )
             await session.rollback()
             raise
         except Exception as e:
-            logger.error(f"Error creating group admin: {e}")
+            logger.error(
+                f"Ошибка при создании администратора группы: {e}", exc_info=True
+            )
             await session.rollback()
             raise
 
@@ -38,53 +46,101 @@ class GroupAdminRepository:
     async def get_group_admin_by_chat_id(
         session: AsyncSession, chat_id: int
     ) -> Optional[GroupAdmin]:
-        """Retrieves a group admin record by chat ID."""
+        """Получает запись администратора группы по chat_id."""
         try:
             stmt = select(GroupAdmin).where(GroupAdmin.chat_id == chat_id)
             result = await session.execute(stmt)
             group_admin = result.scalar_one_or_none()
+            if group_admin:
+                logger.info(
+                    f"Найден администратор для группы {chat_id}: user_id={group_admin.user_id}"
+                )
+            else:
+                logger.info(f"Администратор для группы {chat_id} не найден")
             return group_admin
         except Exception as e:
-            logger.error(f"Error getting group admin by chat_id {chat_id}: {e}")
+            logger.error(
+                f"Ошибка при получении администратора для группы {chat_id}: {e}",
+                exc_info=True,
+            )
             raise
 
     @staticmethod
     async def get_group_admins_by_user_id(
         session: AsyncSession, user_id: int
     ) -> List[GroupAdmin]:
-        """Retrieves all group admin records for a specific user_id."""
+        """Получает все записи администраторов групп для указанного user_id."""
         try:
             stmt = select(GroupAdmin).where(GroupAdmin.user_id == user_id)
             result = await session.execute(stmt)
             group_admins = result.scalars().all()
+            logger.info(
+                f"Найдено {len(group_admins)} групп для администратора user_id={user_id}"
+            )
             return list(group_admins)
         except Exception as e:
-            logger.error(f"Error getting group admins by user_id {user_id}: {e}")
+            logger.error(
+                f"Ошибка при получении групп для администратора user_id={user_id}: {e}",
+                exc_info=True,
+            )
             raise
 
     @staticmethod
     async def delete_group_admin(session: AsyncSession, chat_id: int) -> bool:
-        """Deletes a group admin record by chat ID."""
+        """Удаляет запись администратора группы по chat_id."""
         try:
             stmt = delete(GroupAdmin).where(GroupAdmin.chat_id == chat_id)
             result = await session.execute(stmt)
             await session.commit()
-            return result.rowcount is not None and result.rowcount > 0
+            success = result.rowcount is not None and result.rowcount > 0
+            logger.info(
+                f"Удаление администратора группы {chat_id}: {'успешно' if success else 'не найдено'}"
+            )
+            return success
         except Exception as e:
-            logger.error(f"Error deleting group admin {chat_id}: {e}")
+            logger.error(
+                f"Ошибка при удалении администратора группы {chat_id}: {e}",
+                exc_info=True,
+            )
             await session.rollback()
             raise
 
     @staticmethod
     async def group_admin_exists(session: AsyncSession, chat_id: int) -> bool:
-        """Checks if a group admin record exists by chat ID."""
+        """Проверяет, существует ли запись администратора группы по chat_id."""
         try:
             stmt = select(func.count(GroupAdmin.chat_id)).where(
                 GroupAdmin.chat_id == chat_id
             )
             result = await session.execute(stmt)
             count = result.scalar_one()
-            return count > 0
+            exists = count > 0
+            logger.info(
+                f"Проверка существования группы {chat_id}: {'существует' if exists else 'не существует'}"
+            )
+            return exists
         except Exception as e:
-            logger.error(f"Error checking group admin exists {chat_id}: {e}")
+            logger.error(
+                f"Ошибка при проверке существования группы {chat_id}: {e}",
+                exc_info=True,
+            )
+            raise
+
+    @staticmethod
+    async def is_user_admin(session: AsyncSession, user_id: int) -> bool:
+        """Проверяет, является ли пользователь администратором любой группы."""
+        try:
+            group_admins = await GroupAdminRepository.get_group_admins_by_user_id(
+                session, user_id
+            )
+            is_admin = len(group_admins) > 0
+            logger.info(
+                f"Проверка администратора user_id={user_id}: {'является админом' if is_admin else 'не является админом'}"
+            )
+            return is_admin
+        except Exception as e:
+            logger.error(
+                f"Ошибка при проверке администратора user_id={user_id}: {e}",
+                exc_info=True,
+            )
             raise

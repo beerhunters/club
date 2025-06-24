@@ -37,8 +37,9 @@ class EventCreate(BaseModel):
     has_beer_choice: bool
     beer_option_1: Optional[str]
     beer_option_2: Optional[str]
-    created_by: Optional[int]
+    created_by: int
     chat_id: int
+    celery_task_id: Optional[str]
 
 
 class EventResponse(BaseModel):

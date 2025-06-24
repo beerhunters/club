@@ -1,30 +1,46 @@
+#FROM python:3.11-slim
+#
+## Install system dependencies
+##RUN apt-get update && apt-get install -y --no-install-recommends \
+##    gcc \
+##    python3-dev \
+##    libpq-dev \
+##    && rm -rf /var/lib/apt/lists/*
+#
+## Create system user
+#RUN adduser --disabled-password --gecos '' botuser
+#
+## Set working directory
+#WORKDIR /app
+#
+## Copy project
+#COPY . /app
+#
+## Create logs directory and set permissions
+#RUN mkdir -p /app/logs && chown -R botuser:botuser /app/logs
+#
+## Install Python dependencies
+#RUN pip install --no-cache-dir -r requirements.txt
+#
+## Switch to non-root user
+#USER botuser
+#
+## Set PYTHONPATH and run the application
+#ENV PYTHONPATH=/app
+#CMD ["python", "-m", "bot.main"]
 FROM python:3.11-slim
 
-# Install system dependencies
-#RUN apt-get update && apt-get install -y --no-install-recommends \
-#    gcc \
-#    python3-dev \
-#    libpq-dev \
-#    && rm -rf /var/lib/apt/lists/*
+# Установка зависимостей
+RUN pip install --no-cache-dir -U pip setuptools wheel && \
+    useradd -m botuser && \
+    mkdir -p /app/logs /app/celery_data && \
+    chown -R botuser:botuser /app
 
-# Create system user
-RUN adduser --disabled-password --gecos '' botuser
-
-# Set working directory
 WORKDIR /app
-
-# Copy project
-COPY . /app
-
-# Create logs directory and set permissions
-RUN mkdir -p /app/logs && chown -R botuser:botuser /app/logs
-
-# Install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Switch to non-root user
-USER botuser
+COPY . .
 
-# Set PYTHONPATH and run the application
-ENV PYTHONPATH=/app
+USER botuser
 CMD ["python", "-m", "bot.main"]

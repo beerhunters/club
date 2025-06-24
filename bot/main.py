@@ -45,6 +45,7 @@ async def main():
         dp.include_router(join.router)
         dp.include_router(start.router)
         dp.include_router(registration.router)
+        # dp.include_router(event.router)
 
         # Настройка обработчика ошибок
         setup_error_handler(dp, bot)
