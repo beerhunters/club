@@ -87,18 +87,6 @@ def get_beer_choice_keyboard():
     return builder.as_markup()
 
 
-def get_notification_keyboard():
-    builder = InlineKeyboardBuilder()
-    builder.add(
-        types.InlineKeyboardButton(text="🍺 Выбрать пиво", callback_data="cmd_beer")
-    )
-    builder.add(
-        types.InlineKeyboardButton(text="🏠 В начало", callback_data="cmd_start")
-    )
-    builder.adjust(2)
-    return builder.as_markup()
-
-
 @router.message(Command("create_event"))
 @private_chat_only(response_probability=0.5)
 async def create_event_handler(
@@ -651,13 +639,13 @@ async def send_event_notifications(bot: Bot, event):
                             chat_id=user.telegram_id,
                             photo=event.image_file_id,
                             caption=notification_text,
-                            reply_markup=get_notification_keyboard(),
+                            # reply_markup=get_notification_keyboard(),
                         )
                     else:
                         await bot.send_message(
                             chat_id=user.telegram_id,
                             text=notification_text,
-                            reply_markup=get_notification_keyboard(),
+                            # reply_markup=get_notification_keyboard(),
                         )
                     successful_sends += 1
                 except TelegramAPIError as e:
