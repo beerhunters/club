@@ -1,9 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, insert
-from db.models import BeerSelection
+from sqlalchemy import select, insert, func
+from db.models import BeerSelection, Event
 from db.schemas import BeerSelectionCreate
 from bot.logger import setup_logger
-from typing import Optional
+from typing import List, Optional, Dict, Tuple
+import pendulum
 
 logger = setup_logger(__name__)
 
@@ -54,4 +55,61 @@ class BeerRepository:
             return selection
         except Exception as e:
             logger.error(f"Error checking beer selection: {e}", exc_info=True)
+            raise
+
+    @staticmethod
+    async def get_beer_stats(session: AsyncSession, user_id: int) -> Dict[str, int]:
+        try:
+            logger.debug(f"Fetching beer stats for user_id={user_id}")
+            stmt = (
+                select(BeerSelection.beer_choice, func.count(BeerSelection.beer_choice))
+                .where(BeerSelection.user_id == user_id)
+                .group_by(BeerSelection.beer_choice)
+            )
+            result = await session.execute(stmt)
+            stats = {row[0]: row[1] for row in result.all()}
+            logger.info(f"Fetched beer stats for user_id={user_id}: {stats}")
+            return stats
+        except Exception as e:
+            logger.error(f"Error fetching beer stats: {e}", exc_info=True)
+            raise
+
+    @staticmethod
+    async def get_last_beer_choice(
+        session: AsyncSession, user_id: int
+    ) -> Optional[Tuple[str, str, str]]:
+        try:
+            logger.debug(f"Fetching last beer choice for user_id={user_id}")
+            stmt = (
+                select(
+                    BeerSelection.beer_choice,
+                    Event.name,
+                    Event.event_date,
+                    Event.event_time,
+                )
+                .join(Event, BeerSelection.event_id == Event.id)
+                .where(BeerSelection.user_id == user_id)
+                .order_by(BeerSelection.selected_at.desc())
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            row = result.first()
+            if row:
+                beer_choice, event_name, event_date, event_time = row
+                event_datetime = pendulum.datetime(
+                    event_date.year,
+                    event_date.month,
+                    event_date.day,
+                    event_time.hour,
+                    event_time.minute,
+                    tz="Europe/Moscow",
+                ).format("DD.MM.YYYY HH:mm")
+                logger.debug(
+                    f"Found last beer choice for user_id={user_id}: {beer_choice} at {event_name}"
+                )
+                return beer_choice, event_name, event_datetime
+            logger.debug(f"No last beer choice found for user_id={user_id}")
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching last beer choice: {e}", exc_info=True)
             raise
