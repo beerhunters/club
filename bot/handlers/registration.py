@@ -1,6 +1,8 @@
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 from bot.fsm.registration import Registration
 from db.schemas import UserCreate
@@ -18,6 +20,16 @@ from datetime import datetime
 
 router = Router()
 logger = setup_logger("registration")
+
+
+def get_command_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        InlineKeyboardButton(text="🍺 Выбрать пиво", callback_data="select_beer")
+    )
+    builder.add(InlineKeyboardButton(text="👤 Профиль", callback_data="profile"))
+    builder.adjust(2)
+    return builder.as_markup()
 
 
 @router.message(Registration.name)
@@ -69,7 +81,7 @@ async def get_birth_date(message: Message, state: FSMContext, session: AsyncSess
 
     try:
         user = await UserRepository.create_user(session, user_data)
-        await message.answer(REGISTRATION_SUCCESS)
+        await message.answer(REGISTRATION_SUCCESS, reply_markup=get_command_keyboard())
         await state.clear()
         logger.info(f"Зарегистрирован пользователь {user_id}: {user_data}")
     except Exception as e:

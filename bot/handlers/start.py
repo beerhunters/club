@@ -1,5 +1,6 @@
 from aiogram import Router
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +19,16 @@ from bot.logger import setup_logger
 
 router = Router()
 logger = setup_logger("start")
+
+
+def get_command_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        InlineKeyboardButton(text="🍺 Выбрать пиво", callback_data="select_beer")
+    )
+    builder.add(InlineKeyboardButton(text="👤 Профиль", callback_data="profile"))
+    builder.adjust(2)
+    return builder.as_markup()
 
 
 @router.message(CommandStart())
@@ -41,7 +52,9 @@ async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
 
         user = await UserRepository.get_user_by_id(session, user_id)
         if user:
-            await message.answer(START_ALREADY_REGISTERED)
+            await message.answer(
+                START_ALREADY_REGISTERED, reply_markup=get_command_keyboard()
+            )
         else:
             await state.set_state(Registration.name)
             await state.update_data(group_id=group_id)
@@ -72,4 +85,4 @@ async def cmd_start(message: Message, session: AsyncSession, state: FSMContext):
         return
 
     # Просто /start в личке без аргументов
-    await message.answer(START_SIMPLE_TEXT)
+    await message.answer(START_SIMPLE_TEXT, reply_markup=get_command_keyboard())
