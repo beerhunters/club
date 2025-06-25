@@ -21,7 +21,9 @@ async def main():
     try:
         # Инициализация базы данных
         logger.info("Инициализация базы данных...")
-        await init_db()
+        # Инициализация базы данных
+        loop = asyncio.get_event_loop()
+        await init_db(loop=loop)
         logger.info("База данных инициализирована")
 
         # Настройка Redis для FSM

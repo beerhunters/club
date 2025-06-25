@@ -12,13 +12,29 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql+asyncpg://postgres:secret@postgres:5432/myapp"
 )
 
-engine = create_async_engine(DATABASE_URL, echo=False)
-async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 Base = declarative_base()
 
 
-async def init_db(max_retries=5, delay=5):
+def get_async_engine(loop=None):
+    """Создаёт асинхронный движок SQLAlchemy с указанным циклом событий."""
+    if loop is None:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+    return create_async_engine(DATABASE_URL, echo=False, connect_args={"loop": loop})
+
+
+def get_async_session_maker(loop=None):
+    """Создаёт фабрику сессий для указанного цикла событий."""
+    engine = get_async_engine(loop)
+    return async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+
+async def init_db(loop=None, max_retries=5, delay=5):
     """Инициализирует базу данных с повторными попытками."""
+    engine = get_async_engine(loop)
     for attempt in range(1, max_retries + 1):
         try:
             async with engine.begin() as conn:
@@ -31,11 +47,14 @@ async def init_db(max_retries=5, delay=5):
                 logger.error(f"Не удалось инициализировать базу данных: {e}")
                 raise
             await asyncio.sleep(delay)
+        finally:
+            await engine.dispose()
 
 
-async def get_async_session():
+async def get_async_session(loop=None):
     """Генератор асинхронной сессии базы данных для использования с async for."""
-    async with async_session_maker() as session:
+    session_maker = get_async_session_maker(loop)
+    async with session_maker() as session:
         try:
             yield session
         except Exception as e:
@@ -47,9 +66,10 @@ async def get_async_session():
 
 
 @asynccontextmanager
-async def get_async_session_context() -> AsyncSession:
-    """Контекстный менеджер для асинхронной сессии базы данных для использования с async with."""
-    session = async_session_maker()
+async def get_async_session_context(loop=None) -> AsyncSession:
+    """Контекстный менеджер для асинхронной сессии базы данных."""
+    session_maker = get_async_session_maker(loop)
+    session = session_maker()
     try:
         async with session:
             yield session
