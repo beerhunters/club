@@ -44,6 +44,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-myapp}}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       ERROR_CHAT_ID: ${ERROR_CHAT_ID}
+      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FILE: ${LOG_FILE:-bot.log}
       TZ: Europe/Moscow
@@ -86,12 +87,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.bot
-    command: celery -A bot.tasks.event_notification worker --loglevel=info --pool=solo
+    command: celery -A bot.tasks.celery_app worker --loglevel=info --pool=solo
     user: botuser
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-myapp}}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FILE: ${LOG_FILE:-celery_worker.log}
       TZ: Europe/Moscow
@@ -110,12 +112,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.bot
-    command: celery -A bot.tasks.event_notification beat --loglevel=info --schedule=/app/celery_data/celerybeat-schedule
+    command: celery -A bot.tasks.celery_app beat --loglevel=info --schedule=/app/celery_data/celerybeat-schedule
     user: botuser
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-myapp}}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ADMIN_TELEGRAM_ID: ${ADMIN_TELEGRAM_ID}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FILE: ${LOG_FILE:-celery_beat.log}
       TZ: Europe/Moscow

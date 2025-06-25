@@ -1,33 +1,3 @@
-#FROM python:3.11-slim
-#
-## Install system dependencies
-##RUN apt-get update && apt-get install -y --no-install-recommends \
-##    gcc \
-##    python3-dev \
-##    libpq-dev \
-##    && rm -rf /var/lib/apt/lists/*
-#
-## Create system user
-#RUN adduser --disabled-password --gecos '' botuser
-#
-## Set working directory
-#WORKDIR /app
-#
-## Copy project
-#COPY . /app
-#
-## Create logs directory and set permissions
-#RUN mkdir -p /app/logs && chown -R botuser:botuser /app/logs
-#
-## Install Python dependencies
-#RUN pip install --no-cache-dir -r requirements.txt
-#
-## Switch to non-root user
-#USER botuser
-#
-## Set PYTHONPATH and run the application
-#ENV PYTHONPATH=/app
-#CMD ["python", "-m", "bot.main"]
 FROM python:3.11-slim
 
 # Установка зависимостей
@@ -37,10 +7,13 @@ RUN pip install --no-cache-dir -U pip setuptools wheel && \
     chown -R botuser:botuser /app
 
 WORKDIR /app
+
 COPY requirements.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
 USER botuser
+
 CMD ["python", "-m", "bot.main"]

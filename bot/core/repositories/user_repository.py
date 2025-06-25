@@ -20,7 +20,8 @@ class UserRepository:
             return user
         except Exception as e:
             logger.error(
-                f"Ошибка получения пользователя по telegram_id {telegram_id}: {e}"
+                f"Ошибка получения пользователя по telegram_id {telegram_id}: {e}",
+                exc_info=True,
             )
             raise
 
@@ -34,11 +35,13 @@ class UserRepository:
             await session.commit()
             return user
         except IntegrityError as e:
-            logger.error(f"Ошибка целостности при создании пользователя: {e}")
+            logger.error(
+                f"Ошибка целостности при создании пользователя: {e}", exc_info=True
+            )
             await session.rollback()
             raise
         except Exception as e:
-            logger.error(f"Ошибка при создании пользователя: {e}")
+            logger.error(f"Ошибка при создании пользователя: {e}", exc_info=True)
             await session.rollback()
             raise
 
@@ -51,6 +54,19 @@ class UserRepository:
             return result.scalar_one_or_none() is not None
         except Exception as e:
             logger.error(
-                f"Ошибка проверки существования пользователя {telegram_id}: {e}"
+                f"Ошибка проверки существования пользователя {telegram_id}: {e}",
+                exc_info=True,
             )
+            raise
+
+    @staticmethod
+    async def get_all_users(session: AsyncSession, limit: int = 1000) -> List[User]:
+        """Получает всех пользователей с пагинацией."""
+        try:
+            stmt = select(User).limit(limit)
+            result = await session.execute(stmt)
+            users = result.scalars().all()
+            return list(users)
+        except Exception as e:
+            logger.error(f"Ошибка получения всех пользователей: {e}", exc_info=True)
             raise

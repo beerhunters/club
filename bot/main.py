@@ -8,7 +8,7 @@ from redis.asyncio import Redis
 
 from bot.logger import setup_logger
 from bot.middlewares.db import DBSessionMiddleware
-from bot.handlers import start, registration, join
+from bot.handlers import start, registration, join, event
 from bot.error_handler import setup_error_handler
 from shared.config import settings
 from db.database import init_db
@@ -45,7 +45,7 @@ async def main():
         dp.include_router(join.router)
         dp.include_router(start.router)
         dp.include_router(registration.router)
-        # dp.include_router(event.router)
+        dp.include_router(event.router)
 
         # Настройка обработчика ошибок
         setup_error_handler(dp, bot)

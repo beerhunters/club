@@ -144,3 +144,25 @@ class GroupAdminRepository:
                 exc_info=True,
             )
             raise
+
+    @staticmethod
+    async def get_admin_chat_id(session: AsyncSession, user_id: int) -> int | None:
+        """Возвращает chat_id группы, где пользователь является администратором."""
+        try:
+            logger.info(f"Получение admin chat_id для user_id={user_id}")
+            result = await session.execute(
+                select(GroupAdmin.chat_id).where(GroupAdmin.user_id == user_id).limit(1)
+            )
+            chat_id = result.scalar()
+            if chat_id:
+                logger.info(
+                    f"Найден администратор user_id={user_id} для chat_id={chat_id}"
+                )
+            else:
+                logger.warning(f"Для user_id={user_id} не найден admin chat_id")
+            return chat_id
+        except Exception as e:
+            logger.error(
+                f"Error getting admin chat_id for user {user_id}: {e}", exc_info=True
+            )
+            raise
