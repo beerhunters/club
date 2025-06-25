@@ -83,3 +83,5 @@ PROFILE_NOT_REGISTERED = (
     "❌ Вы не зарегистрированы. Пройдите регистрацию через команду /start."
 )
 PROFILE_MESSAGE = "👤 Твой профиль\n\n📛 Имя: {name}\n🎂 Дата рождения: {birth_date}\n📅 Возраст: {age}\n🆔 Telegram ID: {telegram_id}\n📪 Username: {username}\n📅 Дата регистрации: {registered_at}\n\n🍺 Твои выборы пива:\n{beer_stats}\n⏰ Последний выбор: {last_choice}\n\nВыбери действие:"
+# Тексты для бармена
+BARTENDER_NOTIFICATION = "🍺 Заказы на событие '{name}' ({date} @ {time}):\n👥 Участников: {participants}\n{beer_orders}"

@@ -113,3 +113,34 @@ class BeerRepository:
         except Exception as e:
             logger.error(f"Error fetching last beer choice: {e}", exc_info=True)
             raise
+
+    @staticmethod
+    async def get_event_beer_orders(session: AsyncSession, event_id: int) -> dict:
+        """Получает статистику заказов пива для события."""
+        try:
+            # Подсчёт участников (уникальных user_id)
+            stmt = select(func.count(func.distinct(BeerSelection.user_id))).where(
+                BeerSelection.event_id == event_id
+            )
+            result = await session.execute(stmt)
+            participants = result.scalar_one()
+
+            # Подсчёт заказов по типам пива
+            stmt = (
+                select(BeerSelection.beer_choice, func.count())
+                .where(BeerSelection.event_id == event_id)
+                .group_by(BeerSelection.beer_choice)
+            )
+            result = await session.execute(stmt)
+            beer_orders = {row[0]: row[1] for row in result.all()}
+
+            logger.info(
+                f"Статистика заказов для event_id={event_id}: participants={participants}, orders={beer_orders}"
+            )
+            return {"participants": participants, "beer_orders": beer_orders}
+        except Exception as e:
+            logger.error(
+                f"Ошибка при получении статистики заказов для event_id={event_id}: {e}",
+                exc_info=True,
+            )
+            raise
