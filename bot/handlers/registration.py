@@ -1,7 +1,7 @@
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 from bot.fsm.registration import Registration
@@ -13,10 +13,12 @@ from bot.texts import (
     ASK_BIRTH_DATE,
     INVALID_DATE_FORMAT,
     REGISTRATION_SUCCESS,
-    EVENT_ERROR,  # Для сообщения об ошибке
+    EVENT_ERROR,
+    AGE_RESTRICTION,
 )
 from bot.logger import setup_logger
 from datetime import datetime
+import pendulum
 
 router = Router()
 logger = setup_logger("registration")
@@ -24,9 +26,7 @@ logger = setup_logger("registration")
 
 def get_command_keyboard():
     builder = InlineKeyboardBuilder()
-    builder.add(
-        InlineKeyboardButton(text="🍺 Выбрать пиво", callback_data="select_beer")
-    )
+    builder.add(InlineKeyboardButton(text="🍺 Выбрать пиво", callback_data="cmd_beer"))
     builder.add(InlineKeyboardButton(text="👤 Профиль", callback_data="profile"))
     builder.adjust(2)
     return builder.as_markup()
@@ -57,6 +57,16 @@ async def get_birth_date(message: Message, state: FSMContext, session: AsyncSess
                 birth_date = datetime.strptime(raw, "%d.%m").replace(year=1900).date()
             elif raw.count(".") == 2:
                 birth_date = datetime.strptime(raw, "%d.%m.%Y").date()
+                # Проверка возраста
+                today = pendulum.now("Europe/Moscow")
+                age = (
+                    today.year
+                    - birth_date.year
+                    - ((today.month, today.day) < (birth_date.month, birth_date.day))
+                )
+                if age < 18:
+                    await message.answer(AGE_RESTRICTION)
+                    return
             else:
                 raise ValueError
         except ValueError:

@@ -58,3 +58,22 @@ class EventResponse(BaseModel):
     created_by: int
     chat_id: int
     created_at: datetime
+
+
+class BeerSelectionCreate(BaseModel):
+    user_id: int
+    event_id: int
+    chat_id: int
+    beer_choice: str
+
+
+class BeerSelectionResponse(BaseModel):
+    id: int
+    user_id: int
+    event_id: int
+    chat_id: int
+    beer_choice: str
+    selected_at: datetime
+
+    class Config:
+        from_attributes = True

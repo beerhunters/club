@@ -72,3 +72,29 @@ class Event(Base):
         Index("idx_event_chat_date", "chat_id", "event_date"),
         {"schema": "public"},
     )
+
+
+class BeerSelection(Base):
+    __tablename__ = "beer_selections"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(
+        BigInteger,
+        ForeignKey("public.users.telegram_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event_id = Column(
+        Integer,
+        ForeignKey("public.events.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    chat_id = Column(
+        BigInteger,
+        ForeignKey("public.group_admins.chat_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    beer_choice = Column(String(100), nullable=False)
+    selected_at = Column(DateTime(timezone=True), default=func.now())
+    __table_args__ = (
+        Index("idx_beer_selection_user_event", "user_id", "event_id", unique=True),
+        {"schema": "public"},
+    )

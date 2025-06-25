@@ -9,6 +9,7 @@ REGISTER_IN_PRIVATE = "Пройдите регистрацию в личных �
 # Обработчик registration
 NAME_TOO_SHORT = "Имя слишком короткое. Попробуй ещё раз."
 ASK_BIRTH_DATE = "Когда у тебя день рождения? (ДД.ММ.ГГГГ, ДД.ММ или можно пропустить)"
+AGE_RESTRICTION = "❌ Вам должно быть не менее 18 лет. Введите другую дату рождения (ДД.ММ.ГГГГ) или пропустите."
 INVALID_DATE_FORMAT = "Формат неверный. Введи дату в формате ДД.ММ.ГГГГ или ДД.ММ, или напиши «пропустить»."
 REGISTRATION_SUCCESS = "Спасибо! Ты зарегистрирован ✅"
 # Обработчик event
@@ -62,3 +63,15 @@ EVENT_CANCEL_SUCCESS = "❌ Создание события отменено."
 EVENT_NOTIFICATION_TEXT = "🎉 Новое событие!\n\n📝 {name}\n📅 {date}\n🕐 {time}\n📍 {location}\n📖 {description}\n🍺 Пиво: {beer_options}\n\nУвидимся на событии! 🎊"
 EVENT_NOTIFICATION_SUMMARY = "🎉 Событие создано!\n\n📝 Название: {name}\n📅 Дата: {date}\n🕐 Время: {time}\n📍 Место: {location}\n📖 Описание: {description}\n🖼️ Изображение: {image}\n🍺 Выбор пива: {beer_choice}\n🍻 Варианты: {beer_options}\n"
 EVENT_CREATED = "🎉 Событие успешно создано!"
+# Тексты для выбора пива
+BEER_NO_EVENTS = "❌ Нет актуальных событий для выбора пива."
+BEER_EVENT_LIST = "📅 Выберите событие для выбора пива:"
+BEER_EVENT_TOO_LATE = "❌ Выбор пива доступен только за 30 минут до начала события."
+BEER_ALREADY_SELECTED = "❌ Вы уже выбрали пиво: {beer}."
+BEER_EVENT_FULL_INFO = "🎉 Событие:\n\n📝 {name}\n📅 {date}\n🕐 {time}\n📍 {location}\n📖 {description}\n🍺 Пиво: {beer_options}"
+BEER_REQUEST_LOCATION = "📍 Пожалуйста, отправьте вашу геопозицию для подтверждения."
+BEER_TOO_FAR = "❌ Вы слишком далеко от места события. Пожалуйста, отправьте геопозицию ближе к месту."
+BEER_INVALID_LOCATION = "❌ Отправьте геопозицию через Telegram."
+BEER_CHOICE_PROMPT = "🍺 Выберите пиво:"
+BEER_CHOICE_SUCCESS = "✅ Отличный выбор: {beer}!"
+BEER_ERROR = "❌ Ошибка: {error}"

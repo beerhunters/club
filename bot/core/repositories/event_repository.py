@@ -86,6 +86,7 @@ class EventRepository:
         session: AsyncSession, date: date, limit: int = 100
     ) -> List[Event]:
         try:
+            logger.debug(f"Fetching upcoming events for date={date}, limit={limit}")
             stmt = (
                 select(Event)
                 .where(Event.event_date == date)
@@ -94,9 +95,10 @@ class EventRepository:
             )
             result = await session.execute(stmt)
             events = result.scalars().all()
+            logger.info(f"Fetched {len(events)} events for date={date}")
             return list(events)
         except Exception as e:
-            logger.error(f"Ошибка получения событий за дату {date}: {e}", exc_info=True)
+            logger.error(f"Error fetching events for date={date}: {e}", exc_info=True)
             raise
 
     @staticmethod

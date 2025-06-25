@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.core.repositories.event_repository import EventRepository
 from bot.core.repositories.group_admin_repository import GroupAdminRepository
 from bot.core.repositories.user_repository import UserRepository
+from bot.fsm.event import EventCreationStates
 from db.database import get_async_session, get_async_session_context
 from db.schemas import EventCreate
 from bot.texts import (
@@ -52,18 +53,6 @@ logger = setup_logger(__name__)
 router = Router()
 
 
-class EventCreationStates(StatesGroup):
-    waiting_for_name = State()
-    waiting_for_date = State()
-    waiting_for_time = State()
-    waiting_for_location = State()
-    waiting_for_location_name = State()
-    waiting_for_description = State()
-    waiting_for_image = State()
-    waiting_for_beer_choice = State()
-    waiting_for_beer_options = State()
-
-
 def get_cancel_keyboard():
     builder = InlineKeyboardBuilder()
     builder.add(
@@ -84,6 +73,16 @@ def get_beer_choice_keyboard():
         )
     )
     builder.adjust(2, 1)
+    return builder.as_markup()
+
+
+def get_command_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.add(
+        types.InlineKeyboardButton(text="🍺 Выбрать пиво", callback_data="cmd_beer")
+    )
+    builder.add(types.InlineKeyboardButton(text="👤 Профиль", callback_data="profile"))
+    builder.adjust(2)
     return builder.as_markup()
 
 
@@ -639,13 +638,13 @@ async def send_event_notifications(bot: Bot, event):
                             chat_id=user.telegram_id,
                             photo=event.image_file_id,
                             caption=notification_text,
-                            # reply_markup=get_notification_keyboard(),
+                            reply_markup=get_command_keyboard(),
                         )
                     else:
                         await bot.send_message(
                             chat_id=user.telegram_id,
                             text=notification_text,
-                            # reply_markup=get_notification_keyboard(),
+                            reply_markup=get_command_keyboard(),
                         )
                     successful_sends += 1
                 except TelegramAPIError as e:

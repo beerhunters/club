@@ -11,5 +11,3 @@ class EventCreationStates(StatesGroup):
     waiting_for_image = State()
     waiting_for_beer_choice = State()
     waiting_for_beer_options = State()
-    waiting_for_notification_choice = State()
-    waiting_for_notification_time = State()
