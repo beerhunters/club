@@ -15,6 +15,7 @@ from bot.texts import (
     ALREADY_REGISTERED_IN_GROUP,
     REGISTER_IN_PRIVATE,
     START_MESSAGE,
+    BOT_NOT_ADMIN,
 )
 from bot.fsm.registration import Registration
 from shared.decorators import private_chat_only
@@ -32,6 +33,19 @@ def get_command_keyboard():
     return builder.as_markup()
 
 
+async def is_bot_admin(bot: Bot, chat_id: int) -> bool:
+    """Проверяет, является ли бот администратором в группе."""
+    try:
+        bot_user = await bot.get_me()
+        chat_member = await bot.get_chat_member(chat_id=chat_id, user_id=bot_user.id)
+        return chat_member.status in ["administrator", "creator"]
+    except Exception as e:
+        logger.error(
+            f"Error checking bot admin status for chat_id={chat_id}: {e}", exc_info=True
+        )
+        return False
+
+
 async def start_command(
     chat_id: int,
     user_id: int,
@@ -45,6 +59,16 @@ async def start_command(
         f"Starting /start or cmd_start for user_id={user_id}, group_id={group_id}, is_private={is_private}"
     )
     try:
+        # Проверка статуса администратора в группе
+        if not is_private:
+            if not await is_bot_admin(bot, chat_id):
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=BOT_NOT_ADMIN,
+                )
+                await state.clear()
+                return
+
         user = await UserRepository.get_user_by_id(session, user_id)
 
         # Проверяем, зарегистрирован ли пользователь в указанной группе (для групп)

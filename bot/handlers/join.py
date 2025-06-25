@@ -5,6 +5,7 @@ from aiogram.exceptions import TelegramForbiddenError
 from sqlalchemy.ext.asyncio import AsyncSession
 from bot.core.repositories.group_admin_repository import GroupAdminRepository
 from db.schemas import GroupAdminCreate
+from bot.texts import GROUP_ADMIN_REMOVED
 from bot.logger import setup_logger
 
 router = Router()
@@ -21,16 +22,13 @@ async def on_my_chat_member(event: ChatMemberUpdated, bot: Bot, session: AsyncSe
                 f"Обновление касается другого пользователя: {event.new_chat_member.user.id}"
             )
             return
-        if event.new_chat_member.status in [
-            ChatMemberStatus.KICKED,
-            ChatMemberStatus.LEFT,
-        ]:
-            logger.warning(
-                f"Бот исключен или покинул чат {event.chat.id}, пропускаем обработку"
-            )
-            return
-        admin_id = event.from_user.id
+
         chat_id = event.chat.id
+        admin_id = event.from_user.id
+        new_status = event.new_chat_member.status
+        old_status = event.old_chat_member.status
+
+        # Проверяем, является ли пользователь администратором
         try:
             member = await bot.get_chat_member(chat_id, admin_id)
             if member.status not in [
@@ -46,26 +44,40 @@ async def on_my_chat_member(event: ChatMemberUpdated, bot: Bot, session: AsyncSe
                 f"Не удалось проверить статус администратора {admin_id} в чате {chat_id}: {e}"
             )
             return
-        if (
-            event.old_chat_member.status
-            in [ChatMemberStatus.LEFT, ChatMemberStatus.MEMBER, ChatMemberStatus.KICKED]
-            and event.new_chat_member.status == ChatMemberStatus.ADMINISTRATOR
-        ):
-            logger.info(
-                f"Бот стал администратором в чате {chat_id}, добавил {admin_id}"
-            )
-            try:
+
+        if new_status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR]:
+            if old_status in [
+                ChatMemberStatus.LEFT,
+                ChatMemberStatus.MEMBER,
+                ChatMemberStatus.KICKED,
+            ]:
+                logger.info(
+                    f"Бот стал администратором в чате {chat_id}, добавил {admin_id}"
+                )
                 group_admin_data = GroupAdminCreate(chat_id=chat_id, user_id=admin_id)
                 await GroupAdminRepository.create_group_admin(
                     session=session, group_admin_data=group_admin_data
                 )
                 logger.info(f"Сохранен администратор {admin_id} для чата {chat_id}")
-            except Exception as e:
-                logger.error(f"Ошибка сохранения администратора группы: {e}")
-                raise
+        elif new_status in [
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.LEFT,
+            ChatMemberStatus.KICKED,
+        ]:
+            logger.info(f"Бот потерял права администратора в чате {chat_id}")
+            if await GroupAdminRepository.delete_group_admin(session, chat_id):
+                try:
+                    await bot.send_message(
+                        chat_id=chat_id,
+                        text=GROUP_ADMIN_REMOVED,
+                    )
+                except TelegramForbiddenError as e:
+                    logger.warning(
+                        f"Не удалось отправить сообщение в чат {chat_id}: {e}"
+                    )
         else:
             logger.info(
-                f"Изменение прав бота не подходит под критерий. Статусы: {event.old_chat_member.status} -> {event.new_chat_member.status}"
+                f"Изменение прав бота не подходит под критерий. Статусы: {old_status} -> {new_status}"
             )
     except Exception as e:
         logger.error(f"Ошибка при обработке события my_chat_member: {e}", exc_info=True)

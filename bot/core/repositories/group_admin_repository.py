@@ -15,7 +15,16 @@ class GroupAdminRepository:
         session: AsyncSession, group_admin_data: GroupAdminCreate
     ) -> GroupAdmin:
         """Создает новую запись администратора группы в базе данных."""
+        chat_id = group_admin_data.chat_id
+        user_id = group_admin_data.user_id
         try:
+            # Проверяем, существует ли запись
+            if await GroupAdminRepository.group_admin_exists(session, chat_id):
+                logger.info(f"Запись для группы chat_id={chat_id} уже существует")
+                return await GroupAdminRepository.get_group_admin_by_chat_id(
+                    session, chat_id
+                )
+
             stmt = (
                 insert(GroupAdmin)
                 .values(**group_admin_data.model_dump())
@@ -29,15 +38,20 @@ class GroupAdminRepository:
             )
             return group_admin
         except IntegrityError as e:
-            logger.error(
-                f"Ошибка целостности при создании администратора группы: {e}",
-                exc_info=True,
+            logger.warning(
+                f"Повторная попытка создания записи для chat_id={chat_id}: {e}"
             )
             await session.rollback()
+            existing_admin = await GroupAdminRepository.get_group_admin_by_chat_id(
+                session, chat_id
+            )
+            if existing_admin:
+                return existing_admin
             raise
         except Exception as e:
             logger.error(
-                f"Ошибка при создании администратора группы: {e}", exc_info=True
+                f"Ошибка при создании администратора группы для chat_id={chat_id}: {e}",
+                exc_info=True,
             )
             await session.rollback()
             raise
