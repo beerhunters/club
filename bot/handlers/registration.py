@@ -140,7 +140,7 @@ async def show_profile(
                     < (user.birth_date.month, user.birth_date.day)
                 )
             )
-            age_str = f"📅 Возраст: {age} лет\n"
+            age_str = f"{age} лет\n"
 
         beer_stats = await BeerRepository.get_beer_stats(session, user_id)
         beer_stats_str = "Нет выборов\n"
@@ -171,9 +171,6 @@ async def show_profile(
             age=age_str,
             telegram_id=user.telegram_id,
             username=user.username or "Не указан",
-            # registered_at=user.registered_at.in_timezone("Europe/Moscow").format(
-            #     "DD.MM.YYYY HH:mm"
-            # ),
             registered_at=registered_at,
             beer_stats=beer_stats_str,
             last_choice=last_choice_str,
