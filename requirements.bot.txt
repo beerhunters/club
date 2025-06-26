@@ -1,13 +1,9 @@
 aiogram==3.7.0
-Flask==2.3.3
-flask-session==0.8.0
 python-dotenv==1.0.1
 SQLAlchemy[asyncio]==2.0.35
 asyncpg==0.30.0
 celery==5.4.0
 redis==5.0.8
-flower==2.0.1
-gunicorn==22.0.0
-requests==2.32.3
 pendulum==3.0.0
 pydantic==2.4.1
+requests==2.32.3

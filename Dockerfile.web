@@ -7,11 +7,11 @@ RUN useradd -m webuser
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем requirements.txt для кэширования зависимостей
-COPY requirements.txt .
+# Копируем requirements.web.txt для кэширования зависимостей
+COPY requirements.web.txt .
 
 # Устанавливаем зависимости
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.web.txt
 
 # Копируем остальной код
 COPY . .
