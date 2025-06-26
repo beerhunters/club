@@ -53,7 +53,7 @@ from db.models import Event
 import pendulum
 import re
 from datetime import time, datetime
-from typing import Optional
+from typing import Optional, Union
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from aiogram.exceptions import TelegramAPIError
 
@@ -104,22 +104,36 @@ def get_notification_choice_keyboard():
 
 
 @router.message(Command("create_event"))
+@router.callback_query(lambda c: c.data == "cmd_create_event")
 @private_chat_only(response_probability=0.5)
 async def create_event_handler(
-    message: types.Message, bot: Bot, state: FSMContext, session: AsyncSession
+    update: Union[types.Message, types.CallbackQuery],
+    bot: Bot,
+    state: FSMContext,
+    session: AsyncSession,
 ):
     try:
-        user_id = message.from_user.id
+        if isinstance(update, types.Message):
+            user_id = update.from_user.id
+            chat_id = update.chat.id
+        else:  # types.CallbackQuery
+            await update.answer()
+            user_id = update.from_user.id
+            chat_id = update.message.chat.id
+            logger.info(
+                f"create_event_handler: user_id={user_id}, from_user={update.from_user}, bot_id={(await bot.get_me()).id}"
+            )
+
         admin_chat_id = await GroupAdminRepository.get_admin_chat_id(session, user_id)
         if not admin_chat_id:
             await bot.send_message(
-                chat_id=message.chat.id,
+                chat_id=chat_id,
                 text=EVENT_NO_PERMISSION,
             )
             return
         await state.update_data(admin_chat_id=admin_chat_id, user_id=user_id)
         await bot.send_message(
-            chat_id=message.chat.id,
+            chat_id=chat_id,
             text=EVENT_NAME_PROMPT,
             reply_markup=get_cancel_keyboard(),
         )
@@ -127,7 +141,7 @@ async def create_event_handler(
     except Exception as e:
         logger.error(f"Error in create_event handler: {e}", exc_info=True)
         await bot.send_message(
-            chat_id=message.chat.id,
+            chat_id=chat_id,
             text=EVENT_ERROR,
             reply_markup=get_cancel_keyboard(),
         )
