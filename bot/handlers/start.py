@@ -25,7 +25,7 @@ router = Router()
 logger = setup_logger("start")
 
 
-def get_command_keyboard(is_admin: bool = False):
+def get_command_keyboard(is_admin: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text="🍺 Выбрать пиво", callback_data="cmd_beer"))
     builder.add(InlineKeyboardButton(text="👤 Профиль", callback_data="cmd_profile"))
@@ -77,6 +77,7 @@ async def start_command(
 
         user = await UserRepository.get_user_by_id(session, user_id)
         is_admin = bool(await GroupAdminRepository.get_admin_chat_id(session, user_id))
+
         # Проверяем, зарегистрирован ли пользователь в указанной группе (для групп)
         if not is_private and group_id:
             if user and user.registered_from_group_id == group_id:
@@ -139,6 +140,7 @@ async def start_command(
         await bot.send_message(
             chat_id=chat_id,
             text="🎲",
+            reply_markup=get_command_keyboard(is_admin=is_admin),
         )
         await state.clear()
     except Exception as e:
@@ -195,19 +197,17 @@ async def start_callback_handler(
 ):
     try:
         await callback_query.answer()
-        is_admin = bool(
-            await GroupAdminRepository.get_admin_chat_id(
-                session, callback_query.from_user.id
-            )
+        user_id = callback_query.from_user.id
+        logger.info(
+            f"start_callback_handler: from_user={callback_query.from_user}, user_id={user_id}"
         )
         await start_command(
             chat_id=callback_query.message.chat.id,
-            user_id=callback_query.from_user.id,
+            user_id=user_id,
             bot=bot,
             state=state,
             session=session,
             is_private=True,
-            is_admin=is_admin,
         )
     except Exception as e:
         logger.error(f"Error in start_callback_handler: {e}", exc_info=True)

@@ -1,22 +1,27 @@
-FROM python:3.11-slim
+# Используем конкретную версию Python для воспроизводимости
+FROM python:3.11.9-slim
 
-# 1. Создаем пользователя
-RUN adduser --disabled-password --gecos '' webuser
+# Создаём пользователя
+RUN useradd -m webuser
 
-# 2. Работаем как root: создаем рабочую директорию и необходимые папки с правами
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-COPY . /app
+# Копируем requirements.txt для кэширования зависимостей
+COPY requirements.txt .
 
-# Создаем папки и даем права пользователю webuser
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем остальной код
+COPY . .
+
+# Создаём директории для логов и сессий, устанавливаем права
 RUN mkdir -p /app/logs /app/flask_session && \
     chown -R webuser:webuser /app/logs /app/flask_session
 
-# 3. Установка зависимостей
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 4. Переключаемся на обычного пользователя
+# Переключаемся на не-root пользователя
 USER webuser
 
-# 5. Запуск Gunicorn
+# Запускаем Gunicorn
 CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5050", "web.app:app"]
