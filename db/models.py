@@ -67,7 +67,9 @@ class Event(Base):
         nullable=False,
     )
     celery_task_id = Column(String, nullable=True)
+    bartender_task_id = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=func.now())
+    notification_time = Column(DateTime(timezone=True), nullable=True)
     __table_args__ = (
         Index("idx_event_chat_date", "chat_id", "event_date"),
         {"schema": "public"},

@@ -29,7 +29,11 @@ def get_command_keyboard():
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text="🍺 Выбрать пиво", callback_data="cmd_beer"))
     builder.add(InlineKeyboardButton(text="👤 Профиль", callback_data="cmd_profile"))
-    builder.adjust(2)
+    # user_id = message.from_user.id
+    # admin_chat_id = await GroupAdminRepository.get_admin_chat_id(session, user_id)
+    # if admin_chat_id:
+    #     builder.add(InlineKeyboardButton(text="Создать событие", callback_data="cmd_create_event"))
+    # builder.adjust(2)
     return builder.as_markup()
 
 

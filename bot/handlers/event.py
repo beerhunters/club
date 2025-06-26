@@ -8,7 +8,7 @@ from bot.core.repositories.event_repository import EventRepository
 from bot.core.repositories.group_admin_repository import GroupAdminRepository
 from bot.core.repositories.user_repository import UserRepository
 from bot.fsm.event import EventCreationStates
-from db.database import get_async_session, get_async_session_context
+from db.database import get_async_session_context
 from db.schemas import EventCreate
 from bot.texts import (
     EVENT_NOT_PRIVATE,
@@ -36,6 +36,14 @@ from bot.texts import (
     EVENT_ERROR,
     EVENT_CANCEL_SUCCESS,
     EVENT_NOTIFICATION_TEXT,
+    EVENT_NOTIFICATION_CHOICE_PROMPT,
+    EVENT_NOTIFICATION_TIME_PROMPT,
+    EVENT_NOTIFICATION_TIME_INVALID,
+    EVENT_NOTIFICATION_TIME_PAST,
+    EVENT_NOTIFICATION_SCHEDULED,
+    EVENT_NOTIFICATION_TIME_PROMPT_SCHEDULED,
+    EVENT_NOTIFICATION_TIME_INVALID_SCHEDULED,
+    EVENT_NOTIFICATION_TIME_PAST_SCHEDULED,
 )
 from shared.decorators import private_chat_only
 from bot.logger import setup_logger
@@ -86,6 +94,15 @@ def get_command_keyboard():
     return builder.as_markup()
 
 
+def get_notification_choice_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Уведомить сейчас", callback_data="notify_now")
+    builder.button(text="Отложенный пост", callback_data="notify_later")
+    builder.button(text="Отмена", callback_data="cancel_event_creation")
+    builder.adjust(2)
+    return builder.as_markup()
+
+
 @router.message(Command("create_event"))
 @private_chat_only(response_probability=0.5)
 async def create_event_handler(
@@ -93,7 +110,6 @@ async def create_event_handler(
 ):
     try:
         user_id = message.from_user.id
-        # Получаем chat_id группы, где пользователь является администратором
         admin_chat_id = await GroupAdminRepository.get_admin_chat_id(session, user_id)
         if not admin_chat_id:
             await bot.send_message(
@@ -101,7 +117,6 @@ async def create_event_handler(
                 text=EVENT_NO_PERMISSION,
             )
             return
-        # Сохраняем chat_id группы в состоянии
         await state.update_data(admin_chat_id=admin_chat_id, user_id=user_id)
         await bot.send_message(
             chat_id=message.chat.id,
@@ -171,7 +186,6 @@ async def process_event_date(message: types.Message, bot: Bot, state: FSMContext
                 reply_markup=get_cancel_keyboard(),
             )
             return
-        # Преобразуем event_date в строку для сериализации
         await state.update_data(event_date=event_date.to_date_string())
         await bot.send_message(
             chat_id=message.chat.id,
@@ -216,7 +230,6 @@ async def process_event_time(message: types.Message, bot: Bot, state: FSMContext
             )
             return
         event_time = time(hour=hour, minute=minute)
-        # Преобразуем event_time в строку для сериализации
         await state.update_data(event_time=event_time.strftime("%H:%M"))
         await bot.send_message(
             chat_id=message.chat.id,
@@ -420,13 +433,14 @@ async def process_beer_choice(
             )
             await state.set_state(EventCreationStates.waiting_for_beer_options)
         else:
-            await finalize_event_creation(
-                callback_query.message,
-                bot,
-                state,
-                beer_option_1="Лагер",
-                beer_option_2=None,
+            await state.update_data(beer_option_1="Лагер", beer_option_2=None)
+            await bot.edit_message_text(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                text=EVENT_NOTIFICATION_CHOICE_PROMPT,
+                reply_markup=get_notification_choice_keyboard(),
             )
+            await state.set_state(EventCreationStates.waiting_for_notification_choice)
     except Exception as e:
         logger.error(f"Error processing beer choice: {e}", exc_info=True)
         await bot.edit_message_text(
@@ -460,9 +474,15 @@ async def process_beer_options(message: types.Message, bot: Bot, state: FSMConte
                 reply_markup=get_cancel_keyboard(),
             )
             return
-        await finalize_event_creation(
-            message, bot, state, beer_options[0], beer_options[1]
+        await state.update_data(
+            beer_option_1=beer_options[0], beer_option_2=beer_options[1]
         )
+        await bot.send_message(
+            chat_id=message.chat.id,
+            text=EVENT_NOTIFICATION_CHOICE_PROMPT,
+            reply_markup=get_notification_choice_keyboard(),
+        )
+        await state.set_state(EventCreationStates.waiting_for_notification_choice)
     except Exception as e:
         logger.error(f"Error processing beer options: {e}", exc_info=True)
         await bot.send_message(
@@ -473,16 +493,120 @@ async def process_beer_options(message: types.Message, bot: Bot, state: FSMConte
         await state.clear()
 
 
+@router.callback_query(lambda c: c.data in ["notify_now", "notify_later"])
+@private_chat_only(response_probability=0.5)
+async def process_notification_choice(
+    callback_query: types.CallbackQuery, bot: Bot, state: FSMContext
+):
+    try:
+        await callback_query.answer()
+        notify_now = callback_query.data == "notify_now"
+        await state.update_data(notify_now=notify_now)
+        if notify_now:
+            await finalize_event_creation(
+                callback_query.message, bot, state, notify_now=True
+            )
+        else:
+            await bot.edit_message_text(
+                chat_id=callback_query.message.chat.id,
+                message_id=callback_query.message.message_id,
+                text=EVENT_NOTIFICATION_TIME_PROMPT_SCHEDULED,
+                reply_markup=get_cancel_keyboard(),
+            )
+            await state.set_state(EventCreationStates.waiting_for_notification_time)
+    except Exception as e:
+        logger.error(f"Error processing notification choice: {e}", exc_info=True)
+        await bot.edit_message_text(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+            text=EVENT_ERROR,
+            reply_markup=get_cancel_keyboard(),
+        )
+        await state.clear()
+
+
+@router.message(EventCreationStates.waiting_for_notification_time)
+@private_chat_only(response_probability=0.5)
+async def process_notification_time(
+    message: types.Message, bot: Bot, state: FSMContext
+):
+    try:
+        time_str = message.text.strip()
+        if not re.match(r"^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}$", time_str):
+            await bot.send_message(
+                chat_id=message.chat.id,
+                text=EVENT_NOTIFICATION_TIME_INVALID_SCHEDULED,
+                reply_markup=get_cancel_keyboard(),
+            )
+            return
+        notification_time = pendulum.from_format(
+            time_str, "DD.MM.YYYY HH:mm", tz="Europe/Moscow"
+        )
+        now = pendulum.now("Europe/Moscow")
+        if notification_time <= now:
+            await bot.send_message(
+                chat_id=message.chat.id,
+                text=EVENT_NOTIFICATION_TIME_PAST_SCHEDULED,
+                reply_markup=get_cancel_keyboard(),
+            )
+            return
+        # await state.update_data(notification_time=notification_time)
+        # Сохраняем notification_time как строку ISO 8601
+        await state.update_data(notification_time=notification_time.isoformat())
+        await finalize_event_creation(message, bot, state, notify_now=False)
+        await bot.send_message(
+            chat_id=message.chat.id,
+            text=EVENT_NOTIFICATION_SCHEDULED.format(
+                datetime=notification_time.format("DD.MM.YYYY HH:mm")
+            ),
+        )
+    except pendulum.exceptions.ParserError:
+        await bot.send_message(
+            chat_id=message.chat.id,
+            text=EVENT_NOTIFICATION_TIME_INVALID_SCHEDULED,
+            reply_markup=get_cancel_keyboard(),
+        )
+    except Exception as e:
+        logger.error(f"Error processing notification time: {e}", exc_info=True)
+        await bot.send_message(
+            chat_id=message.chat.id,
+            text=EVENT_ERROR,
+            reply_markup=get_cancel_keyboard(),
+        )
+        await state.clear()
+
+
+@router.callback_query(lambda c: c.data == "cancel_event_creation")
+@private_chat_only(response_probability=0.5)
+async def cancel_event_creation(
+    callback_query: types.CallbackQuery, bot: Bot, state: FSMContext
+):
+    try:
+        await callback_query.answer()
+        await state.clear()
+        await bot.edit_message_text(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+            text=EVENT_CANCEL_SUCCESS,
+        )
+    except Exception as e:
+        logger.error(f"Error cancelling event creation: {e}", exc_info=True)
+        await bot.edit_message_text(
+            chat_id=callback_query.message.chat.id,
+            message_id=callback_query.message.message_id,
+            text=EVENT_ERROR,
+            reply_markup=get_cancel_keyboard(),
+        )
+
+
 async def finalize_event_creation(
-    message: types.Message,
-    bot: Bot,
-    state: FSMContext,
-    beer_option_1: Optional[str],
-    beer_option_2: Optional[str],
+    message: types.Message, bot: Bot, state: FSMContext, notify_now: bool
 ):
     try:
         data = await state.get_data()
         has_beer_choice = data.get("has_beer_choice", False)
+        beer_option_1 = data.get("beer_option_1")
+        beer_option_2 = data.get("beer_option_2")
         if has_beer_choice and (not beer_option_1 or not beer_option_2):
             await bot.send_message(
                 chat_id=message.chat.id,
@@ -490,12 +614,16 @@ async def finalize_event_creation(
                 reply_markup=get_cancel_keyboard(),
             )
             return
-        # Преобразуем event_date из строки обратно в pendulum.Date
         event_date = pendulum.parse(data["event_date"]).date()
-        # Преобразуем event_time из строки обратно в time
         event_time = datetime.strptime(data["event_time"], "%H:%M").time()
         chat_id = int(data["admin_chat_id"])
         user_id = int(data["user_id"])
+        notification_time_str = data.get("notification_time")
+        notification_time = (
+            pendulum.parse(notification_time_str, tz="Europe/Moscow")
+            if notification_time_str
+            else None
+        )
         event_data = EventCreate(
             name=data["name"],
             event_date=event_date,
@@ -511,6 +639,7 @@ async def finalize_event_creation(
             created_by=user_id,
             chat_id=chat_id,
             celery_task_id=None,
+            notification_time=notification_time,
         )
         async with get_async_session_context() as session:
             try:
@@ -523,28 +652,22 @@ async def finalize_event_creation(
                     minute=event.event_time.minute,
                     tz="Europe/Moscow",
                 )
-                task_id = None
+                user_task_id = None
+                bartender_task_id = None
+                # Планируем задачу для уведомления бармена в event_start
                 try:
-                    eta = datetime(
-                        year=event_start.year,
-                        month=event_start.month,
-                        day=event_start.day,
-                        hour=event_start.hour,
-                        minute=event_start.minute,
-                        tzinfo=event_start.tzinfo,
-                    )
-                    task = celery_app.send_task(
-                        "bot.tasks.bartender_notification.process_event_notification",
+                    bartender_task = celery_app.send_task(
+                        "bot.tasks.bartender_notification.process_bartender_notification",
                         args=(event.id,),
-                        eta=eta,
+                        eta=event_start,
                     )
-                    task_id = task.id
+                    bartender_task_id = bartender_task.id
                     logger.info(
-                        f"Scheduled Celery task {task_id} for event {event.id} at {eta}"
+                        f"Scheduled Celery bartender task {bartender_task_id} for event {event.id} at {event_start}"
                     )
                 except Exception as e:
                     logger.error(
-                        f"Failed to schedule task for event {event.id}: {e}",
+                        f"Failed to schedule bartender task for event {event.id}: {e}",
                         exc_info=True,
                     )
                     await bot.send_message(
@@ -553,15 +676,46 @@ async def finalize_event_creation(
                     )
                     await state.clear()
                     return
-                if task_id:
+                # Планируем задачу для уведомления пользователей
+                if notify_now:
+                    await send_event_notifications(bot, event)
+                else:
+                    try:
+                        user_task = celery_app.send_task(
+                            "bot.tasks.bartender_notification.process_user_notification",
+                            args=(event.id,),
+                            eta=notification_time,
+                        )
+                        user_task_id = user_task.id
+                        logger.info(
+                            f"Scheduled Celery user notification task {user_task_id} for event {event.id} at {notification_time}"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to schedule user notification task for event {event.id}: {e}",
+                            exc_info=True,
+                        )
+                        await bot.send_message(
+                            chat_id=message.chat.id,
+                            text="⚠️ Событие создано, но уведомление пользователям не запланировано.",
+                        )
+                        await state.clear()
+                        return
+                # Сохраняем ID задач в базе данных
+                if user_task_id or bartender_task_id:
                     stmt = (
                         update(Event)
                         .where(Event.id == event.id)
-                        .values(celery_task_id=task_id)
+                        .values(
+                            celery_task_id=user_task_id,
+                            bartender_task_id=bartender_task_id,
+                        )
                     )
                     await session.execute(stmt)
                     await session.commit()
-                    logger.info(f"Saved Celery task ID {task_id} for event {event.id}")
+                    logger.info(
+                        f"Saved Celery tasks: user_task_id={user_task_id}, bartender_task_id={bartender_task_id} for event {event.id}"
+                    )
                 summary = EVENT_NOTIFICATION_SUMMARY.format(
                     name=event.name,
                     date=event.event_date.strftime("%d.%m.%Y"),
@@ -577,7 +731,6 @@ async def finalize_event_creation(
                     ),
                 )
                 await bot.send_message(chat_id=message.chat.id, text=summary)
-                await send_event_notifications(bot, event)
                 await bot.send_message(chat_id=message.chat.id, text=EVENT_CREATED)
                 logger.info(f"Event created: {event.id} by {message.from_user.id}")
             except IntegrityError as e:
@@ -662,26 +815,3 @@ async def send_event_notifications(bot: Bot, event):
             )
     except Exception as e:
         logger.error(f"Error sending event notifications: {e}", exc_info=True)
-
-
-@router.callback_query(lambda c: c.data == "cancel_event_creation")
-@private_chat_only(response_probability=0.5)
-async def cancel_event_creation(
-    callback_query: types.CallbackQuery, bot: Bot, state: FSMContext
-):
-    try:
-        await callback_query.answer()
-        await state.clear()
-        await bot.edit_message_text(
-            chat_id=callback_query.message.chat.id,
-            message_id=callback_query.message.message_id,
-            text=EVENT_CANCEL_SUCCESS,
-        )
-    except Exception as e:
-        logger.error(f"Error cancelling event creation: {e}", exc_info=True)
-        await bot.edit_message_text(
-            chat_id=callback_query.message.chat.id,
-            message_id=callback_query.message.message_id,
-            text=EVENT_ERROR,
-            reply_markup=get_cancel_keyboard(),
-        )

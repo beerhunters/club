@@ -40,6 +40,7 @@ class EventCreate(BaseModel):
     created_by: int
     chat_id: int
     celery_task_id: Optional[str]
+    notification_time: Optional[datetime]
 
 
 class EventResponse(BaseModel):
@@ -58,6 +59,7 @@ class EventResponse(BaseModel):
     created_by: int
     chat_id: int
     created_at: datetime
+    notification_time: datetime | None
 
 
 class BeerSelectionCreate(BaseModel):
